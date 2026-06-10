@@ -1,35 +1,42 @@
 /**
- * Dock - 程序坞效果
- * 技术：鼠标距离感应 + 缩放动画
- * 原创实现
+ * Dock - macOS 程序坞
+ * 核心技术：基于 React Bits 研究
+ * - 关键：根据鼠标 X 与图标中心距离插值 width/height（不是简单 scale）
+ * - 弹簧动画使尺寸变化平滑
+ * - hover 时显示 tooltip 标签
  */
 
 class Dock {
     constructor(options = {}) {
         this.container = options.container;
         this.items = options.items || [];
-        this.maxScale = options.maxScale || 1.6;
-        this.scaleRadius = options.scaleRadius || 100;
-        this.iconSize = options.iconSize || 48;
-        this.gap = options.gap || 8;
-        this.background = options.background || 'rgba(255, 255, 255, 0.1)';
+        this.distance = options.distance || 200;       // 影响范围（px）
+        this.baseSize = options.baseSize || 50;         // 基础尺寸
+        this.magnification = options.magnification || 70; // 放大后尺寸
+        this.panelHeight = options.panelHeight || 64;
+        this.spring = options.spring || { stiffness: 0.2, damping: 0.7 };
+
+        this.mouseX = Infinity;
+        this.iconStates = [];
 
         this.init();
+        this.animate();
     }
 
     init() {
-        // 创建 dock 容器
-        this.dockEl = document.createElement('div');
-        this.dockEl.style.cssText = `
-            display: flex;
+        this.dock = document.createElement('div');
+        this.dock.style.cssText = `
+            display: inline-flex;
             align-items: flex-end;
-            gap: ${this.gap}px;
-            padding: 12px;
-            background: ${this.background};
+            gap: 16px;
+            height: ${this.panelHeight}px;
+            padding: 0 8px;
+            background: rgba(6, 6, 6, 0.7);
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
-            border-radius: 16px;
             border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            box-sizing: border-box;
         `;
 
         this.iconElements = [];
@@ -37,100 +44,118 @@ class Dock {
         this.items.forEach((item, idx) => {
             const wrapper = document.createElement('div');
             wrapper.style.cssText = `
-                display: flex;
-                flex-direction: column;
-                align-items: center;
                 position: relative;
-                cursor: pointer;
-                transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
-                transform-origin: bottom center;
-            `;
-
-            const icon = document.createElement('div');
-            icon.style.cssText = `
-                width: ${this.iconSize}px;
-                height: ${this.iconSize}px;
-                border-radius: 12px;
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                font-size: ${this.iconSize * 0.5}px;
-                background: ${item.bgColor || 'rgba(255, 255, 255, 0.15)'};
+                background: ${item.bgColor || 'rgba(255, 255, 255, 0.1)'};
+                border: 1px solid rgba(255, 255, 255, 0.15);
+                border-radius: 12px;
+                cursor: pointer;
                 color: ${item.color || '#fff'};
+                will-change: width, height;
+                flex-shrink: 0;
             `;
-            icon.textContent = item.icon || '🚀';
 
-            // tooltip
-            const tooltip = document.createElement('div');
-            tooltip.style.cssText = `
-                position: absolute;
-                bottom: 100%;
-                margin-bottom: 8px;
-                padding: 4px 10px;
-                background: rgba(0, 0, 0, 0.8);
-                color: #fff;
-                font-size: 12px;
-                border-radius: 6px;
-                white-space: nowrap;
-                opacity: 0;
-                transition: opacity 0.2s;
+            // icon
+            const icon = document.createElement('div');
+            icon.style.cssText = `
+                font-size: 60%;
+                line-height: 1;
                 pointer-events: none;
             `;
-            tooltip.textContent = item.label || '';
-
+            icon.textContent = item.icon || '·';
             wrapper.appendChild(icon);
-            wrapper.appendChild(tooltip);
+
+            // tooltip
+            const label = document.createElement('div');
+            label.style.cssText = `
+                position: absolute;
+                bottom: calc(100% + 8px);
+                left: 50%;
+                transform: translateX(-50%) translateY(6px);
+                padding: 4px 10px;
+                background: rgba(6, 6, 6, 0.9);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                color: #fff;
+                font-size: 12px;
+                white-space: nowrap;
+                border-radius: 6px;
+                opacity: 0;
+                transition: opacity 0.2s, transform 0.2s;
+                pointer-events: none;
+            `;
+            label.textContent = item.label || '';
+            wrapper.appendChild(label);
 
             wrapper.addEventListener('mouseenter', () => {
-                tooltip.style.opacity = '1';
+                label.style.opacity = '1';
+                label.style.transform = 'translateX(-50%) translateY(0)';
             });
             wrapper.addEventListener('mouseleave', () => {
-                tooltip.style.opacity = '0';
+                label.style.opacity = '0';
+                label.style.transform = 'translateX(-50%) translateY(6px)';
             });
 
             if (item.onClick) {
                 wrapper.addEventListener('click', item.onClick);
             }
 
-            this.dockEl.appendChild(wrapper);
+            this.dock.appendChild(wrapper);
             this.iconElements.push(wrapper);
+            this.iconStates.push({
+                size: this.baseSize,
+                target: this.baseSize,
+                vel: 0
+            });
         });
 
-        this.container.appendChild(this.dockEl);
+        this.container.appendChild(this.dock);
 
-        // 鼠标移动时缩放
-        this.dockEl.addEventListener('mousemove', (e) => this.handleMouseMove(e));
-        this.dockEl.addEventListener('mouseleave', () => this.handleMouseLeave());
+        // 鼠标事件绑定到整个 dock
+        this.dock.addEventListener('mousemove', (e) => {
+            this.mouseX = e.clientX;
+        });
+        this.dock.addEventListener('mouseleave', () => {
+            this.mouseX = Infinity;
+        });
     }
 
-    handleMouseMove(e) {
-        const dockRect = this.dockEl.getBoundingClientRect();
-        const mouseX = e.clientX;
+    animate() {
+        // 计算每个图标的目标尺寸
+        this.iconElements.forEach((el, i) => {
+            const rect = el.getBoundingClientRect();
+            const center = rect.left + rect.width / 2;
+            const dist = this.mouseX - center;
 
-        this.iconElements.forEach((iconEl) => {
-            const rect = iconEl.getBoundingClientRect();
-            const iconCenter = rect.left + rect.width / 2;
-            const distance = Math.abs(mouseX - iconCenter);
-
-            if (distance < this.scaleRadius) {
-                const scaleFactor = 1 - distance / this.scaleRadius;
-                const scale = 1 + (this.maxScale - 1) * scaleFactor;
-                iconEl.style.transform = `scale(${scale})`;
+            // 距离范围内才放大
+            const absD = Math.abs(dist);
+            if (absD < this.distance) {
+                const t = 1 - absD / this.distance;
+                // 平滑插值（使用 cosine 曲线让中心放大最多）
+                const eased = (1 - Math.cos(t * Math.PI)) / 2;
+                this.iconStates[i].target = this.baseSize + (this.magnification - this.baseSize) * eased;
             } else {
-                iconEl.style.transform = 'scale(1)';
+                this.iconStates[i].target = this.baseSize;
             }
-        });
-    }
 
-    handleMouseLeave() {
-        this.iconElements.forEach((iconEl) => {
-            iconEl.style.transform = 'scale(1)';
+            // 弹簧物理
+            const s = this.iconStates[i];
+            const force = (s.target - s.size) * this.spring.stiffness;
+            s.vel = (s.vel + force) * this.spring.damping;
+            s.size += s.vel;
+
+            el.style.width = s.size + 'px';
+            el.style.height = s.size + 'px';
+            // 字体随尺寸变化
+            el.firstChild.style.fontSize = (s.size * 0.5) + 'px';
         });
+
+        this.animationId = requestAnimationFrame(() => this.animate());
     }
 
     destroy() {
-        if (this.dockEl && this.dockEl.parentNode) {
-            this.dockEl.parentNode.removeChild(this.dockEl);
-        }
+        if (this.animationId) cancelAnimationFrame(this.animationId);
+        this.dock.remove();
     }
 }

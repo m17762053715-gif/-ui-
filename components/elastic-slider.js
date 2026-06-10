@@ -1,66 +1,104 @@
 /**
  * ElasticSlider - 弹性滑块
- * 技术：拉伸感应 + 弹簧物理
- * 原创实现
+ * 核心技术：基于 React Bits 研究
+ * - decay 衰减函数：超出边界的拉伸量随距离衰减
+ * - region 区域：left/middle/right，决定拉伸方向
+ * - 释放时弹簧回弹 (bounce 0.5)
+ * - hover 时整体放大 1.2x
+ * - 图标按 overflow 量横向平移
  */
 
 class ElasticSlider {
     constructor(options = {}) {
         this.container = options.container;
-        this.min = options.min ?? 0;
-        this.max = options.max ?? 100;
-        this.value = options.value ?? 50;
-        this.step = options.step ?? 1;
-        this.color = options.color || '#667eea';
+        this.startValue = options.startValue ?? 0;
+        this.maxValue = options.maxValue ?? 100;
+        this.value = options.value ?? options.defaultValue ?? 50;
+        this.stepSize = options.stepSize ?? 1;
+        this.isStepped = options.isStepped || false;
+        this.color = options.color || '#ffffff';
+        this.leftIcon = options.leftIcon || '🔉';
+        this.rightIcon = options.rightIcon || '🔊';
+        this.maxOverflow = options.maxOverflow ?? 50;
         this.onChange = options.onChange || (() => {});
 
+        this.region = 'middle';     // left | middle | right
+        this.overflow = 0;          // 当前实际拉伸量
+        this.targetOverflow = 0;    // 目标拉伸量
+        this.scale = 1;             // 整体缩放
+        this.targetScale = 1;
         this.dragging = false;
-        this.stretchOffset = 0;
-        this.targetStretch = 0;
+        this.bouncing = false;
 
         this.init();
         this.animate();
+    }
+
+    // 衰减函数：value 越大，返回值增长越慢，趋近于 max
+    decay(value, max) {
+        if (value === 0) return 0;
+        const entry = value / max;
+        const sigmoid = 2 / (1 + Math.exp(-entry)) - 1;
+        return sigmoid * max;
     }
 
     init() {
         this.wrapper = document.createElement('div');
         this.wrapper.style.cssText = `
             display: flex;
+            flex-direction: column;
             align-items: center;
             gap: 12px;
-            padding: 16px 0;
             user-select: none;
             width: 100%;
+            padding: 12px 0;
+            touch-action: none;
         `;
 
-        // 减号图标
-        this.minIcon = document.createElement('span');
-        this.minIcon.style.cssText = `
+        // slider 行
+        this.row = document.createElement('div');
+        this.row.style.cssText = `
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            width: 100%;
+            transform-origin: center;
+            transition: opacity 0.25s;
+            opacity: 0.7;
+        `;
+
+        // 左图标
+        this.leftEl = document.createElement('span');
+        this.leftEl.textContent = this.leftIcon;
+        this.leftEl.style.cssText = `
+            font-size: 22px;
             color: rgba(255,255,255,0.6);
-            font-size: 18px;
-            transition: transform 0.2s;
+            transition: transform 0.15s;
+            flex-shrink: 0;
         `;
-        this.minIcon.textContent = '–';
 
-        // 加号图标
-        this.maxIcon = document.createElement('span');
-        this.maxIcon.style.cssText = `
-            color: rgba(255,255,255,0.6);
-            font-size: 18px;
-            transition: transform 0.2s;
+        // 滑动区域容器
+        this.sliderArea = document.createElement('div');
+        this.sliderArea.style.cssText = `
+            position: relative;
+            flex: 1;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            cursor: grab;
         `;
-        this.maxIcon.textContent = '+';
 
-        // 滑块轨道
+        // track
         this.track = document.createElement('div');
         this.track.style.cssText = `
             position: relative;
-            flex: 1;
+            width: 100%;
             height: 6px;
-            background: rgba(255,255,255,0.15);
+            background: rgba(128, 128, 128, 0.4);
             border-radius: 3px;
-            cursor: pointer;
-            transition: height 0.2s, transform 0.2s;
+            overflow: visible;
+            transform-origin: center;
+            transition: height 0.2s;
         `;
 
         // 填充
@@ -72,108 +110,163 @@ class ElasticSlider {
             height: 100%;
             background: ${this.color};
             border-radius: 3px;
-            pointer-events: none;
+        `;
+        this.track.appendChild(this.fill);
+        this.sliderArea.appendChild(this.track);
+
+        // 右图标
+        this.rightEl = document.createElement('span');
+        this.rightEl.textContent = this.rightIcon;
+        this.rightEl.style.cssText = `
+            font-size: 22px;
+            color: rgba(255,255,255,0.6);
+            transition: transform 0.15s;
+            flex-shrink: 0;
         `;
 
-        this.track.appendChild(this.fill);
-        this.wrapper.appendChild(this.minIcon);
-        this.wrapper.appendChild(this.track);
-        this.wrapper.appendChild(this.maxIcon);
+        this.row.appendChild(this.leftEl);
+        this.row.appendChild(this.sliderArea);
+        this.row.appendChild(this.rightEl);
+
+        // 数值显示
+        this.valueLabel = document.createElement('div');
+        this.valueLabel.style.cssText = `
+            font-size: 11px;
+            color: rgba(255,255,255,0.5);
+            font-family: monospace;
+            letter-spacing: 1px;
+        `;
+
+        this.wrapper.appendChild(this.row);
+        this.wrapper.appendChild(this.valueLabel);
         this.container.appendChild(this.wrapper);
 
         // 事件
-        this.track.addEventListener('mousedown', (e) => this.startDrag(e));
-        this.track.addEventListener('touchstart', (e) => this.startDrag(e.touches[0]));
+        this.row.addEventListener('mouseenter', () => { this.targetScale = 1.2; this.row.style.opacity = '1'; });
+        this.row.addEventListener('mouseleave', () => {
+            if (!this.dragging) { this.targetScale = 1; this.row.style.opacity = '0.7'; }
+        });
 
-        document.addEventListener('mousemove', (e) => this.onDrag(e));
-        document.addEventListener('touchmove', (e) => this.onDrag(e.touches[0]));
-
-        document.addEventListener('mouseup', () => this.endDrag());
-        document.addEventListener('touchend', () => this.endDrag());
+        this.sliderArea.addEventListener('pointerdown', (e) => this.onDown(e));
+        document.addEventListener('pointermove', (e) => this.onMove(e));
+        document.addEventListener('pointerup', () => this.onUp());
 
         this.updateUI();
     }
 
-    startDrag(e) {
+    onDown(e) {
         this.dragging = true;
+        this.bouncing = false;
         this.track.style.height = '10px';
-        this.onDrag(e);
+        this.handleMove(e.clientX);
+        try { e.target.setPointerCapture && e.target.setPointerCapture(e.pointerId); } catch {}
     }
 
-    onDrag(e) {
+    onMove(e) {
         if (!this.dragging) return;
+        this.handleMove(e.clientX);
+    }
 
-        const rect = this.track.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-
-        // 计算超出边界的拉伸量
-        if (x < 0) {
-            this.targetStretch = Math.max(x, -40);
-        } else if (x > rect.width) {
-            this.targetStretch = Math.min(x - rect.width, 40);
-        } else {
-            this.targetStretch = 0;
-        }
-
-        // 更新值
-        const ratio = Math.max(0, Math.min(1, x / rect.width));
-        const rawValue = this.min + ratio * (this.max - this.min);
-        const steppedValue = Math.round(rawValue / this.step) * this.step;
-
-        if (steppedValue !== this.value) {
-            this.value = steppedValue;
-            this.updateUI();
-            this.onChange(this.value);
+    onUp() {
+        if (!this.dragging) return;
+        this.dragging = false;
+        this.track.style.height = '6px';
+        // 启动弹簧回弹
+        this.bouncing = true;
+        this.targetOverflow = 0;
+        // 检查鼠标是否还在 row 上
+        if (!this.row.matches(':hover')) {
+            this.targetScale = 1;
+            this.row.style.opacity = '0.7';
         }
     }
 
-    endDrag() {
-        this.dragging = false;
-        this.targetStretch = 0;
-        this.track.style.height = '6px';
+    handleMove(clientX) {
+        const rect = this.track.getBoundingClientRect();
+        const left = rect.left;
+        const right = rect.right;
+        const width = rect.width;
+
+        // 区域判断 + overflow 计算
+        let raw = 0;
+        if (clientX < left) {
+            this.region = 'left';
+            raw = left - clientX;
+        } else if (clientX > right) {
+            this.region = 'right';
+            raw = clientX - right;
+        } else {
+            this.region = 'middle';
+            raw = 0;
+        }
+        this.targetOverflow = this.decay(raw, this.maxOverflow);
+
+        // 数值更新
+        let newValue = this.startValue + ((clientX - left) / width) * (this.maxValue - this.startValue);
+        if (this.isStepped) {
+            newValue = Math.round(newValue / this.stepSize) * this.stepSize;
+        }
+        newValue = Math.min(Math.max(newValue, this.startValue), this.maxValue);
+        if (newValue !== this.value) {
+            this.value = newValue;
+            this.onChange(this.value);
+            this.updateUI();
+        }
     }
 
     updateUI() {
-        const ratio = (this.value - this.min) / (this.max - this.min);
+        const ratio = (this.value - this.startValue) / (this.maxValue - this.startValue);
         this.fill.style.width = (ratio * 100) + '%';
+        this.valueLabel.textContent = Math.round(this.value);
     }
 
     animate() {
-        // 弹簧物理
-        const spring = 0.2;
-        const damping = 0.7;
-        this.stretchOffset += (this.targetStretch - this.stretchOffset) * spring;
-        this.stretchOffset *= damping + (1 - damping);
-
-        // 应用拉伸变换
-        if (Math.abs(this.stretchOffset) > 0.5) {
-            const scaleX = 1 + Math.abs(this.stretchOffset) / 200;
-            const translateX = this.stretchOffset * 0.3;
-            this.track.style.transform = `translateX(${translateX}px) scaleX(${scaleX})`;
-
-            // 图标也跟随移动
-            if (this.stretchOffset < 0) {
-                this.minIcon.style.transform = `translateX(${this.stretchOffset * 0.5}px)`;
-                this.maxIcon.style.transform = '';
-            } else {
-                this.maxIcon.style.transform = `translateX(${this.stretchOffset * 0.5}px)`;
-                this.minIcon.style.transform = '';
+        // 弹簧物理（接近目标 + 回弹）
+        if (this.bouncing) {
+            // 强弹簧回零
+            this.overflow += (0 - this.overflow) * 0.18;
+            // 微震荡
+            if (Math.abs(this.overflow) < 0.5) {
+                this.overflow = 0;
+                this.bouncing = false;
             }
         } else {
-            this.track.style.transform = '';
-            this.minIcon.style.transform = '';
-            this.maxIcon.style.transform = '';
+            this.overflow += (this.targetOverflow - this.overflow) * 0.25;
         }
 
-        requestAnimationFrame(() => this.animate());
+        // scale 平滑插值
+        this.scale += (this.targetScale - this.scale) * 0.18;
+
+        // 应用：track 横向拉伸 + 整体缩放
+        const stretch = 1 + Math.abs(this.overflow) / 200;
+        const trackOriginX = this.region === 'left' ? '100%' : (this.region === 'right' ? '0%' : '50%');
+        this.track.style.transformOrigin = `${trackOriginX} 50%`;
+        this.track.style.transform = `scaleX(${stretch})`;
+
+        this.row.style.transform = `scale(${this.scale})`;
+
+        // 图标响应（被推向远离方向）
+        if (this.region === 'left') {
+            this.leftEl.style.transform = `translateX(${-this.overflow / this.scale}px) scale(1.4)`;
+            this.rightEl.style.transform = '';
+        } else if (this.region === 'right') {
+            this.rightEl.style.transform = `translateX(${this.overflow / this.scale}px) scale(1.4)`;
+            this.leftEl.style.transform = '';
+        } else {
+            this.leftEl.style.transform = '';
+            this.rightEl.style.transform = '';
+        }
+
+        this.animationId = requestAnimationFrame(() => this.animate());
     }
 
     setValue(v) {
-        this.value = Math.max(this.min, Math.min(this.max, v));
+        this.value = Math.min(Math.max(v, this.startValue), this.maxValue);
         this.updateUI();
     }
 
     destroy() {
+        if (this.animationId) cancelAnimationFrame(this.animationId);
         this.wrapper.remove();
     }
 }
