@@ -212,16 +212,24 @@
         new Prism({ container: document.getElementById('demo-prism'), speed: 0.5 });
 
         // 交互组件
-        new BorderGlow({ element: document.getElementById('border-glow-target') });
+        new BorderGlow({
+            element: document.getElementById('border-glow-target'),
+            colors: ['#5227FF', '#7cff67', '#FFB347'],
+            glowColor: '#7cff67',
+            intensity: 1.0
+        });
         new Dock({
             container: document.getElementById('demo-dock'),
+            distance: 200,
+            baseSize: 50,
+            magnification: 70,
             items: [
-                { icon: '🚀', label: 'Launch', bgColor: '#ff0080' },
-                { icon: '🎨', label: 'Design', bgColor: '#7928ca' },
-                { icon: '⚡', label: 'Speed', bgColor: '#0070f3' },
-                { icon: '🎯', label: 'Focus', bgColor: '#00ff88' },
-                { icon: '🔥', label: 'Trending', bgColor: '#ff6b00' },
-                { icon: '💎', label: 'Premium', bgColor: '#00d2ff' }
+                { icon: '🚀', label: 'Launch', bgColor: 'rgba(255, 0, 128, 0.6)' },
+                { icon: '🎨', label: 'Design', bgColor: 'rgba(121, 40, 202, 0.6)' },
+                { icon: '⚡', label: 'Speed', bgColor: 'rgba(0, 112, 243, 0.6)' },
+                { icon: '🎯', label: 'Focus', bgColor: 'rgba(0, 255, 136, 0.6)' },
+                { icon: '🔥', label: 'Trend', bgColor: 'rgba(255, 107, 0, 0.6)' },
+                { icon: '💎', label: 'Premium', bgColor: 'rgba(0, 210, 255, 0.6)' }
             ]
         });
         // 居中 dock
@@ -230,24 +238,42 @@
         dockEl.style.alignItems = 'center';
         dockEl.style.justifyContent = 'center';
 
-        new ElasticSlider({ container: document.getElementById('demo-slider'), value: 50 });
+        new ElasticSlider({
+            container: document.getElementById('demo-slider'),
+            defaultValue: 50,
+            startValue: 0,
+            maxValue: 100,
+            isStepped: false
+        });
 
         new GooeyNav({
             container: document.getElementById('demo-gooeynav'),
+            initialActiveIndex: 0,
+            colors: ['#5227FF', '#7cff67', '#FFB347', '#ff6b6b'],
             items: [
                 { label: '首页' }, { label: '产品' }, { label: '关于' }, { label: '联系' }
             ]
         });
 
-        new FluidGlass({ container: document.getElementById('demo-fluidglass'), size: 100 });
+        new FluidGlass({
+            container: document.getElementById('demo-fluidglass'),
+            size: 130,
+            distortion: 1.0,
+            blurAmount: 4,
+            saturation: 200,
+            chromaticAberration: 1.0
+        });
 
         new SplashCursor({ container: document.getElementById('demo-splash') });
 
         new TrueFocus({
             container: document.getElementById('demo-truefocus'),
-            text: 'TRUE FOCUS NOW',
+            sentence: 'TRUE FOCUS NOW',
             borderColor: '#00ffff',
-            glowColor: 'rgba(0, 255, 255, 0.5)'
+            glowColor: 'rgba(0, 255, 255, 0.5)',
+            blurAmount: 5,
+            animationDuration: 0.5,
+            pauseBetween: 1
         });
 
         // FPS 监控
