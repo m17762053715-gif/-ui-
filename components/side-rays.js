@@ -1,108 +1,195 @@
 /**
- * SideRays - 侧边光线效果
- * 技术：CSS 渐变 + 锥形光束动画
- * 原创实现
+ * SideRays - 侧边光线
+ * 核心算法：基于 React Bits 研究
+ * - WebGL 着色器：从屏幕角落发射光束
+ * - rayStrength：余弦角度 + 时间动画产生闪烁
+ * - 距离衰减：远处光束变弱
  */
 
 class SideRays {
     constructor(options = {}) {
         this.container = options.container;
-        this.color = options.color || '#00ffff';
-        this.speed = options.speed || 1.0;
-        this.rayCount = options.rayCount || 5;
-        this.origin = options.origin || 'top-left'; // top-left, top-right, bottom-left, bottom-right
+        this.color1 = options.color1 || '#ffffff';
+        this.color2 = options.color2 || '#a855f7';
+        this.speed = options.speed || 2.5;
+        this.intensity = options.intensity || 1.0;
+        this.spread = options.spread || 1.0;
+        this.tilt = options.tilt || 0;
+        this.opacity = options.opacity || 1.0;
+        this.origin = options.origin || 'top-right'; // top-left/top-right/bottom-left/bottom-right
 
         this.canvas = document.createElement('canvas');
-        this.ctx = this.canvas.getContext('2d');
+        this.canvas.style.cssText = 'width:100%;height:100%;display:block;';
+        this.gl = this.canvas.getContext('webgl');
+        if (!this.gl) {
+            console.error('WebGL 不支持');
+            return;
+        }
         this.container.appendChild(this.canvas);
 
-        this.time = 0;
+        this.init();
         this.resize();
         window.addEventListener('resize', () => this.resize());
+        this.startTime = performance.now();
         this.animate();
+    }
+
+    init() {
+        const gl = this.gl;
+
+        const vsSource = `
+            attribute vec2 position;
+            void main() {
+                gl_Position = vec4(position, 0.0, 1.0);
+            }
+        `;
+
+        const fsSource = `
+            precision highp float;
+            uniform float uTime;
+            uniform vec2 uResolution;
+            uniform float uSpeed;
+            uniform vec3 uColor1;
+            uniform vec3 uColor2;
+            uniform float uIntensity;
+            uniform float uSpread;
+            uniform float uFlipX;
+            uniform float uFlipY;
+            uniform float uTilt;
+            uniform float uOpacity;
+
+            // 计算光束强度：基于角度和时间
+            float rayStrength(vec2 src, vec2 dir, vec2 coord, float seedA, float seedB) {
+                vec2 toCoord = coord - src;
+                float cosA = dot(normalize(toCoord), dir);
+                float a = 0.45 + 0.15 * sin(cosA * seedA + uTime * uSpeed);
+                float b = 0.30 + 0.20 * cos(-cosA * seedB + uTime * uSpeed);
+                float strength = clamp(a + b, 0.0, 1.0);
+                // 距离衰减
+                float falloff = clamp((uResolution.x - length(toCoord)) / uResolution.x, 0.5, 1.0);
+                return strength * falloff;
+            }
+
+            void main() {
+                vec2 fc = gl_FragCoord.xy;
+                if (uFlipX > 0.5) fc.x = uResolution.x - fc.x;
+                if (uFlipY > 0.5) fc.y = uResolution.y - fc.y;
+
+                vec2 coord = vec2(fc.x, uResolution.y - fc.y);
+                // 光源在屏幕外（右上角外侧）
+                vec2 raySrc = vec2(uResolution.x * 1.1, -0.5 * uResolution.y);
+
+                // 倾斜处理
+                float tr = uTilt * 3.14159265 / 180.0;
+                float cs = cos(tr), sn = sin(tr);
+                vec2 rel = coord - raySrc;
+                vec2 tilted = vec2(rel.x * cs - rel.y * sn, rel.x * sn + rel.y * cs) + raySrc;
+
+                // 两个略微不同的光束方向
+                float half_s = uSpread * 0.275;
+                vec2 dir1 = normalize(vec2(cos(0.785398 + half_s), sin(0.785398 + half_s)));
+                vec2 dir2 = normalize(vec2(cos(0.785398 - half_s), sin(0.785398 - half_s)));
+
+                vec3 c1 = uColor1 * rayStrength(raySrc, dir1, tilted, 36.2214, 21.11349);
+                vec3 c2 = uColor2 * rayStrength(raySrc, dir2, tilted, 22.39910, 18.0234);
+
+                // 顶部渐隐
+                c1 *= 0.45 + 0.55 * pow(coord.y / uResolution.y, 0.4);
+                c2 *= 0.55 + 0.45 * pow(coord.y / uResolution.y, 0.4);
+
+                vec3 finalColor = (c1 + c2) * 0.5 * uIntensity;
+                gl_FragColor = vec4(finalColor, uOpacity);
+            }
+        `;
+
+        const compile = (type, src) => {
+            const s = gl.createShader(type);
+            gl.shaderSource(s, src);
+            gl.compileShader(s);
+            if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+                console.error('shader error:', gl.getShaderInfoLog(s));
+            }
+            return s;
+        };
+
+        const vs = compile(gl.VERTEX_SHADER, vsSource);
+        const fs = compile(gl.FRAGMENT_SHADER, fsSource);
+        this.program = gl.createProgram();
+        gl.attachShader(this.program, vs);
+        gl.attachShader(this.program, fs);
+        gl.linkProgram(this.program);
+
+        // 全屏三角形
+        this.posBuf = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.posBuf);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+
+        this.u = {
+            uTime: gl.getUniformLocation(this.program, 'uTime'),
+            uResolution: gl.getUniformLocation(this.program, 'uResolution'),
+            uSpeed: gl.getUniformLocation(this.program, 'uSpeed'),
+            uColor1: gl.getUniformLocation(this.program, 'uColor1'),
+            uColor2: gl.getUniformLocation(this.program, 'uColor2'),
+            uIntensity: gl.getUniformLocation(this.program, 'uIntensity'),
+            uSpread: gl.getUniformLocation(this.program, 'uSpread'),
+            uFlipX: gl.getUniformLocation(this.program, 'uFlipX'),
+            uFlipY: gl.getUniformLocation(this.program, 'uFlipY'),
+            uTilt: gl.getUniformLocation(this.program, 'uTilt'),
+            uOpacity: gl.getUniformLocation(this.program, 'uOpacity')
+        };
+    }
+
+    hexToRgb(hex) {
+        hex = hex.replace(/^#/, '');
+        const i = parseInt(hex, 16);
+        return [((i >> 16) & 255) / 255, ((i >> 8) & 255) / 255, (i & 255) / 255];
+    }
+
+    getFlip() {
+        switch (this.origin) {
+            case 'top-left': return [1, 0];
+            case 'bottom-right': return [0, 1];
+            case 'bottom-left': return [1, 1];
+            default: return [0, 0]; // top-right
+        }
     }
 
     resize() {
         this.canvas.width = this.container.offsetWidth;
         this.canvas.height = this.container.offsetHeight;
-    }
-
-    getOriginPoint() {
-        const w = this.canvas.width, h = this.canvas.height;
-        switch (this.origin) {
-            case 'top-right': return { x: w, y: 0 };
-            case 'bottom-left': return { x: 0, y: h };
-            case 'bottom-right': return { x: w, y: h };
-            default: return { x: 0, y: 0 };
-        }
-    }
-
-    hexToRgb(hex) {
-        hex = hex.replace(/^#/, '');
-        const int = parseInt(hex, 16);
-        return [(int >> 16) & 255, (int >> 8) & 255, int & 255];
+        this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
     }
 
     animate() {
-        this.time += 0.016 * this.speed;
-        const ctx = this.ctx;
-        const w = this.canvas.width, h = this.canvas.height;
-        const origin = this.getOriginPoint();
-        const [r, g, b] = this.hexToRgb(this.color);
+        const gl = this.gl;
+        const t = (performance.now() - this.startTime) / 1000;
 
-        // 渐隐拖尾
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
-        ctx.fillRect(0, 0, w, h);
+        gl.clearColor(0, 0, 0, 0);
+        gl.clear(gl.COLOR_BUFFER_BIT);
 
-        ctx.globalCompositeOperation = 'lighter';
+        gl.useProgram(this.program);
+        const posLoc = gl.getAttribLocation(this.program, 'position');
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.posBuf);
+        gl.enableVertexAttribArray(posLoc);
+        gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
 
-        const diag = Math.sqrt(w * w + h * h);
+        const c1 = this.hexToRgb(this.color1);
+        const c2 = this.hexToRgb(this.color2);
+        const flip = this.getFlip();
 
-        for (let i = 0; i < this.rayCount; i++) {
-            // 每条光线有不同的相位和角度
-            const phase = i * (Math.PI * 2 / this.rayCount);
-            const wobble = Math.sin(this.time * 0.5 + phase) * 0.3;
+        gl.uniform1f(this.u.uTime, t);
+        gl.uniform2f(this.u.uResolution, this.canvas.width, this.canvas.height);
+        gl.uniform1f(this.u.uSpeed, this.speed);
+        gl.uniform3fv(this.u.uColor1, c1);
+        gl.uniform3fv(this.u.uColor2, c2);
+        gl.uniform1f(this.u.uIntensity, this.intensity);
+        gl.uniform1f(this.u.uSpread, this.spread);
+        gl.uniform1f(this.u.uFlipX, flip[0]);
+        gl.uniform1f(this.u.uFlipY, flip[1]);
+        gl.uniform1f(this.u.uTilt, this.tilt);
+        gl.uniform1f(this.u.uOpacity, this.opacity);
 
-            // 根据 origin 计算扫射角度
-            let baseAngle;
-            switch (this.origin) {
-                case 'top-right': baseAngle = Math.PI * 0.75; break;
-                case 'bottom-left': baseAngle = -Math.PI * 0.25; break;
-                case 'bottom-right': baseAngle = Math.PI * 1.25; break;
-                default: baseAngle = Math.PI * 0.25;
-            }
-
-            const angle = baseAngle + wobble + Math.sin(this.time * 0.3 + i) * 0.4;
-            const len = diag * 1.2;
-            const endX = origin.x + Math.cos(angle) * len;
-            const endY = origin.y + Math.sin(angle) * len;
-
-            // 渐变锥形光束
-            const intensity = 0.3 + 0.4 * Math.abs(Math.sin(this.time + phase * 1.7));
-
-            const grd = ctx.createLinearGradient(origin.x, origin.y, endX, endY);
-            grd.addColorStop(0, `rgba(${r},${g},${b},${intensity})`);
-            grd.addColorStop(0.5, `rgba(${r},${g},${b},${intensity * 0.3})`);
-            grd.addColorStop(1, `rgba(${r},${g},${b},0)`);
-
-            ctx.fillStyle = grd;
-
-            // 绘制三角形光束
-            const spread = 0.15 + 0.05 * Math.sin(this.time + i);
-            const ax = origin.x + Math.cos(angle - spread) * len;
-            const ay = origin.y + Math.sin(angle - spread) * len;
-            const bx = origin.x + Math.cos(angle + spread) * len;
-            const by = origin.y + Math.sin(angle + spread) * len;
-
-            ctx.beginPath();
-            ctx.moveTo(origin.x, origin.y);
-            ctx.lineTo(ax, ay);
-            ctx.lineTo(bx, by);
-            ctx.closePath();
-            ctx.fill();
-        }
-
-        ctx.globalCompositeOperation = 'source-over';
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
 
         this.animationId = requestAnimationFrame(() => this.animate());
     }

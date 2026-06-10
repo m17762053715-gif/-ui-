@@ -1,81 +1,90 @@
 /**
- * SplashCursor - 鼠标喷溅光标
- * 技术：粒子系统 + 鼠标速度感应
- * 原创实现
+ * SplashCursor - 鼠标流体喷溅
+ * 核心思路：基于 React Bits 研究（原版用 Navier-Stokes 流体模拟）
+ * - 简化：使用 metaball 风格的彩色粒子团
+ * - 加性混合 + 大软粒子模拟流体感
+ * - 速度产生喷溅、彩虹色循环
  */
 
 class SplashCursor {
     constructor(options = {}) {
         this.container = options.container || document.body;
-        this.colors = options.colors || ['#ff0080', '#7928ca', '#0070f3', '#00ff88', '#ffaa00'];
-        this.particleCount = options.particleCount || 20;
-        this.lifespan = options.lifespan || 800;
-        this.maxSize = options.maxSize || 30;
+        this.particleCount = options.particleCount || 30;
+        this.lifespan = options.lifespan || 1500;
+        this.maxRadius = options.maxRadius || 80;
+        this.rainbow = options.rainbow !== false;
+        this.baseHue = options.baseHue ?? Math.random() * 360;
+        this.splashForce = options.splashForce || 1.0;
 
         this.particles = [];
         this.lastX = 0;
         this.lastY = 0;
         this.lastTime = performance.now();
+        this.hueOffset = 0;
 
         this.init();
     }
 
     init() {
+        const isBody = this.container === document.body;
         this.canvas = document.createElement('canvas');
         this.canvas.style.cssText = `
-            position: ${this.container === document.body ? 'fixed' : 'absolute'};
-            top: 0;
-            left: 0;
+            position: ${isBody ? 'fixed' : 'absolute'};
+            top: 0; left: 0;
+            width: 100%; height: 100%;
             pointer-events: none;
             z-index: 9999;
         `;
 
+        if (!isBody && getComputedStyle(this.container).position === 'static') {
+            this.container.style.position = 'relative';
+        }
         this.container.appendChild(this.canvas);
         this.ctx = this.canvas.getContext('2d');
 
         this.resize();
-        window.addEventListener('resize', () => this.resize());
+        this.resizeHandler = () => this.resize();
+        window.addEventListener('resize', this.resizeHandler);
 
-        this.handler = (e) => this.onMouseMove(e);
-        const target = this.container === document.body ? window : this.container;
-        target.addEventListener('mousemove', this.handler);
+        this.moveHandler = (e) => this.onMove(e);
+        const tgt = isBody ? window : this.container;
+        tgt.addEventListener('mousemove', this.moveHandler);
 
         this.animate();
     }
 
     resize() {
-        if (this.container === document.body) {
-            this.canvas.width = window.innerWidth;
-            this.canvas.height = window.innerHeight;
-        } else {
-            const rect = this.container.getBoundingClientRect();
-            this.canvas.width = rect.width;
-            this.canvas.height = rect.height;
-        }
+        const isBody = this.container === document.body;
+        const w = isBody ? window.innerWidth : this.container.offsetWidth;
+        const h = isBody ? window.innerHeight : this.container.offsetHeight;
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        this.canvas.width = w * dpr;
+        this.canvas.height = h * dpr;
+        this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        this.width = w;
+        this.height = h;
     }
 
-    onMouseMove(e) {
+    onMove(e) {
         let x, y;
         if (this.container === document.body) {
-            x = e.clientX;
-            y = e.clientY;
+            x = e.clientX; y = e.clientY;
         } else {
-            const rect = this.container.getBoundingClientRect();
-            x = e.clientX - rect.left;
-            y = e.clientY - rect.top;
+            const r = this.container.getBoundingClientRect();
+            x = e.clientX - r.left;
+            y = e.clientY - r.top;
         }
 
         const now = performance.now();
-        const dt = now - this.lastTime;
+        const dt = Math.max(now - this.lastTime, 1);
         const dx = x - this.lastX;
         const dy = y - this.lastY;
-        const speed = Math.sqrt(dx * dx + dy * dy) / Math.max(dt, 1);
+        const speed = Math.sqrt(dx * dx + dy * dy) / dt;
 
         // 速度越快产生越多粒子
-        const count = Math.min(Math.floor(speed * 3), this.particleCount);
-
+        const count = Math.min(Math.ceil(speed * 8 * this.splashForce), this.particleCount);
         for (let i = 0; i < count; i++) {
-            this.spawn(x, y, dx, dy);
+            this.spawn(x, y, dx, dy, speed);
         }
 
         this.lastX = x;
@@ -83,65 +92,79 @@ class SplashCursor {
         this.lastTime = now;
     }
 
-    spawn(x, y, vx, vy) {
+    spawn(x, y, vx, vy, speed) {
         const angle = Math.random() * Math.PI * 2;
-        const speed = 1 + Math.random() * 4;
+        const burst = 0.5 + Math.random() * 2.5;
+
+        // 使用 HSL 让色彩流畅过渡
+        const hue = this.rainbow
+            ? (this.baseHue + this.hueOffset + Math.random() * 40) % 360
+            : this.baseHue;
 
         this.particles.push({
-            x: x,
-            y: y,
-            vx: Math.cos(angle) * speed + vx * 0.05,
-            vy: Math.sin(angle) * speed + vy * 0.05,
-            size: 4 + Math.random() * (this.maxSize - 4),
-            color: this.colors[Math.floor(Math.random() * this.colors.length)],
+            x, y,
+            vx: Math.cos(angle) * burst + vx * 0.08,
+            vy: Math.sin(angle) * burst + vy * 0.08,
+            r: this.maxRadius * (0.4 + Math.random() * 0.6) * Math.min(speed * 0.5 + 0.5, 2),
+            hue,
             born: performance.now(),
-            life: this.lifespan * (0.5 + Math.random() * 0.5)
+            life: this.lifespan * (0.6 + Math.random() * 0.4)
         });
     }
 
     animate() {
+        const ctx = this.ctx;
         const now = performance.now();
-        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-        // 启用混合模式让粒子叠加更绚丽
-        this.ctx.globalCompositeOperation = 'lighter';
+        // 渐隐而非完全清除，制造拖尾
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.fillStyle = 'rgba(0,0,0,0.18)';
+        ctx.fillRect(0, 0, this.width, this.height);
+
+        // 加性混合让粒子重叠时颜色更亮
+        ctx.globalCompositeOperation = 'lighter';
+
+        // 色相缓慢漂移
+        this.hueOffset += 0.5;
 
         this.particles = this.particles.filter(p => {
             const age = now - p.born;
             if (age > p.life) return false;
 
-            // 物理更新
+            // 物理
             p.x += p.vx;
             p.y += p.vy;
-            p.vx *= 0.94;
-            p.vy *= 0.94;
-            p.vy += 0.08; // 微重力
+            p.vx *= 0.93;
+            p.vy *= 0.93;
+            p.vy += 0.03; // 微重力
 
-            // 渐变透明度和大小
             const t = age / p.life;
-            const alpha = 1 - t;
-            const size = p.size * (1 - t * 0.6);
+            const alpha = (1 - t) * 0.6;
+            const r = p.r * (1 - t * 0.5);
 
-            const grd = this.ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, size);
-            grd.addColorStop(0, p.color + Math.floor(alpha * 255).toString(16).padStart(2, '0'));
-            grd.addColorStop(1, p.color + '00');
+            // 大软渐变模拟流体团块
+            const grd = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
+            grd.addColorStop(0, `hsla(${p.hue}, 100%, 70%, ${alpha})`);
+            grd.addColorStop(0.4, `hsla(${(p.hue + 30) % 360}, 100%, 60%, ${alpha * 0.4})`);
+            grd.addColorStop(1, `hsla(${p.hue}, 100%, 50%, 0)`);
 
-            this.ctx.fillStyle = grd;
-            this.ctx.beginPath();
-            this.ctx.arc(p.x, p.y, size, 0, Math.PI * 2);
-            this.ctx.fill();
+            ctx.fillStyle = grd;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+            ctx.fill();
 
             return true;
         });
 
-        this.ctx.globalCompositeOperation = 'source-over';
+        ctx.globalCompositeOperation = 'source-over';
         this.animationId = requestAnimationFrame(() => this.animate());
     }
 
     destroy() {
         if (this.animationId) cancelAnimationFrame(this.animationId);
-        const target = this.container === document.body ? window : this.container;
-        target.removeEventListener('mousemove', this.handler);
+        window.removeEventListener('resize', this.resizeHandler);
+        const tgt = this.container === document.body ? window : this.container;
+        tgt.removeEventListener('mousemove', this.moveHandler);
         this.canvas.remove();
     }
 }

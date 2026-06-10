@@ -1,112 +1,226 @@
 /**
- * Prism - 棱镜光谱效果
- * 技术：旋转的光谱锥形 + 色散
- * 原创实现 - 使用 Canvas 2D 渐变实现彩虹色散效果
+ * Prism - 棱镜光谱
+ * 核心技术：基于 React Bits 研究
+ * - SDF 光线步进（ray marching）渲染棱锥形状
+ * - sin 函数生成彩虹色环
+ * - tanh 函数压缩高光
+ * - Bloom + Glow 效果
  */
 
 class Prism {
     constructor(options = {}) {
         this.container = options.container;
-        this.speed = options.speed || 0.5;
-        this.scale = options.scale || 1.0;
-        this.glowIntensity = options.glowIntensity || 1.0;
+        this.height = options.height || 3.5;
+        this.baseWidth = options.baseWidth || 5.5;
+        this.glow = options.glow || 1.0;
         this.bloom = options.bloom || 1.0;
+        this.scale = options.scale || 3.6;
+        this.colorFreq = options.colorFreq || 1.0;
+        this.hueShift = options.hueShift || 0;
+        this.noise = options.noise || 0.5;
+        this.timeScale = options.timeScale || 0.5;
+        this.useWobble = options.useWobble !== false;
 
         this.canvas = document.createElement('canvas');
-        this.ctx = this.canvas.getContext('2d');
+        this.canvas.style.cssText = 'width:100%;height:100%;display:block;';
+        this.gl = this.canvas.getContext('webgl');
+        if (!this.gl) {
+            console.error('WebGL 不支持');
+            return;
+        }
         this.container.appendChild(this.canvas);
 
-        this.time = 0;
+        this.init();
         this.resize();
         window.addEventListener('resize', () => this.resize());
+        this.startTime = performance.now();
         this.animate();
+    }
+
+    init() {
+        const gl = this.gl;
+
+        const vsSource = `
+            attribute vec2 position;
+            void main() {
+                gl_Position = vec4(position, 0.0, 1.0);
+            }
+        `;
+
+        // 自己写的 ray marching 着色器，使用八面体 SDF + 色相旋转
+        const fsSource = `
+            precision highp float;
+
+            uniform vec2 uRes;
+            uniform float uTime;
+            uniform float uHeight;
+            uniform float uBaseHalf;
+            uniform float uGlow;
+            uniform float uBloom;
+            uniform float uColorFreq;
+            uniform float uHueShift;
+            uniform float uNoise;
+            uniform float uTimeScale;
+            uniform float uUseWobble;
+            uniform float uPxScale;
+
+            // tanh 近似（WebGL 1.0 没有内置 tanh）
+            vec4 vtanh(vec4 x) {
+                vec4 e = exp(2.0 * x);
+                return (e - 1.0) / (e + 1.0);
+            }
+
+            // 简单伪随机
+            float rnd(vec2 co) {
+                return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453);
+            }
+
+            // 八面体 SDF（各向异性）
+            float sdOcta(vec3 p) {
+                vec3 q = vec3(abs(p.x) / uBaseHalf, abs(p.y) / uHeight, abs(p.z) / uBaseHalf);
+                float minAxis = min(uBaseHalf, min(uHeight, uBaseHalf));
+                return (q.x + q.y + q.z - 1.0) * minAxis * 0.5773502;
+            }
+
+            // 上半棱锥 = 八面体 ∩ 上半空间
+            float sdPyramid(vec3 p) {
+                float oct = sdOcta(p);
+                float upper = -p.y;
+                return max(oct, upper);
+            }
+
+            // 色相旋转矩阵
+            mat3 hueRot(float a) {
+                float c = cos(a), s = sin(a);
+                mat3 W = mat3(0.299, 0.587, 0.114, 0.299, 0.587, 0.114, 0.299, 0.587, 0.114);
+                mat3 U = mat3(0.701, -0.587, -0.114, -0.299, 0.413, -0.114, -0.300, -0.588, 0.886);
+                mat3 V = mat3(0.168, -0.331, 0.500, 0.328, 0.035, -0.500, -0.497, 0.296, 0.201);
+                return W + U * c + V * s;
+            }
+
+            // 自动旋转矩阵（绕 Y 和 X 缓慢旋转）
+            mat3 autoRot(float t) {
+                float ay = t * 0.3;
+                float ax = sin(t * 0.4) * 0.4;
+                float cy = cos(ay), sy = sin(ay);
+                float cx = cos(ax), sx = sin(ax);
+                mat3 ry = mat3(cy, 0.0, -sy, 0.0, 1.0, 0.0, sy, 0.0, cy);
+                mat3 rx = mat3(1.0, 0.0, 0.0, 0.0, cx, sx, 0.0, -sx, cx);
+                return rx * ry;
+            }
+
+            void main() {
+                vec2 f = (gl_FragCoord.xy - 0.5 * uRes.xy) * uPxScale;
+
+                float z = 5.0;
+                float d = 0.0;
+                vec4 o = vec4(0.0);
+                vec3 p;
+
+                // base wobble (xz 平面晃动)
+                mat2 wob = mat2(1.0, 0.0, 0.0, 1.0);
+                if (uUseWobble > 0.5) {
+                    float t = uTime * uTimeScale;
+                    wob = mat2(cos(t), cos(t + 33.0), cos(t + 11.0), cos(t));
+                }
+
+                mat3 R = autoRot(uTime * uTimeScale);
+
+                // ray marching 累积彩色光
+                for (int i = 0; i < 80; i++) {
+                    p = vec3(f, z);
+                    p.xz = p.xz * wob;
+                    p = R * p;
+                    d = 0.1 + 0.2 * abs(sdPyramid(p));
+                    z -= d;
+                    // 沿光线累积彩色波纹
+                    o += (sin((p.y + z) * uColorFreq + vec4(0.0, 1.0, 2.0, 3.0)) + 1.0) / d;
+                }
+
+                // tanh 压缩高光
+                o = vtanh(o * o * (uGlow * uBloom) / 1e5);
+
+                vec3 col = o.rgb;
+                // 色相旋转
+                col = hueRot(uHueShift) * col;
+                // 噪点
+                float n = rnd(gl_FragCoord.xy + vec2(uTime));
+                col += (n - 0.5) * uNoise * 0.05;
+
+                gl_FragColor = vec4(col, 1.0);
+            }
+        `;
+
+        const compile = (type, src) => {
+            const s = gl.createShader(type);
+            gl.shaderSource(s, src);
+            gl.compileShader(s);
+            if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+                console.error('Prism shader:', gl.getShaderInfoLog(s));
+            }
+            return s;
+        };
+
+        const vs = compile(gl.VERTEX_SHADER, vsSource);
+        const fs = compile(gl.FRAGMENT_SHADER, fsSource);
+        this.program = gl.createProgram();
+        gl.attachShader(this.program, vs);
+        gl.attachShader(this.program, fs);
+        gl.linkProgram(this.program);
+
+        this.posBuf = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.posBuf);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+
+        this.u = {
+            uRes: gl.getUniformLocation(this.program, 'uRes'),
+            uTime: gl.getUniformLocation(this.program, 'uTime'),
+            uHeight: gl.getUniformLocation(this.program, 'uHeight'),
+            uBaseHalf: gl.getUniformLocation(this.program, 'uBaseHalf'),
+            uGlow: gl.getUniformLocation(this.program, 'uGlow'),
+            uBloom: gl.getUniformLocation(this.program, 'uBloom'),
+            uColorFreq: gl.getUniformLocation(this.program, 'uColorFreq'),
+            uHueShift: gl.getUniformLocation(this.program, 'uHueShift'),
+            uNoise: gl.getUniformLocation(this.program, 'uNoise'),
+            uTimeScale: gl.getUniformLocation(this.program, 'uTimeScale'),
+            uUseWobble: gl.getUniformLocation(this.program, 'uUseWobble'),
+            uPxScale: gl.getUniformLocation(this.program, 'uPxScale')
+        };
     }
 
     resize() {
         this.canvas.width = this.container.offsetWidth;
         this.canvas.height = this.container.offsetHeight;
-    }
-
-    drawSpectrumBeam(cx, cy, angle, length, baseHue) {
-        const ctx = this.ctx;
-        const numLayers = 7; // 七色光
-
-        ctx.save();
-        ctx.translate(cx, cy);
-        ctx.rotate(angle);
-
-        // 多层叠加创造光谱
-        for (let i = 0; i < numLayers; i++) {
-            const t = i / numLayers;
-            const hue = (baseHue + t * 60) % 360;
-            const offset = (t - 0.5) * 30;
-
-            const grd = ctx.createLinearGradient(0, 0, length, 0);
-            grd.addColorStop(0, `hsla(${hue}, 100%, 65%, 0)`);
-            grd.addColorStop(0.1, `hsla(${hue}, 100%, 65%, ${0.4 * this.glowIntensity})`);
-            grd.addColorStop(0.5, `hsla(${hue}, 100%, 70%, ${0.6 * this.glowIntensity})`);
-            grd.addColorStop(1, `hsla(${hue}, 100%, 65%, 0)`);
-
-            ctx.fillStyle = grd;
-            ctx.fillRect(0, offset - 4, length, 8);
-        }
-
-        ctx.restore();
+        this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
     }
 
     animate() {
-        this.time += 0.016 * this.speed;
-        const ctx = this.ctx;
-        const w = this.canvas.width, h = this.canvas.height;
-        const cx = w / 2, cy = h / 2;
-        const minDim = Math.min(w, h);
-        const beamLength = minDim * 0.6 * this.scale;
+        const gl = this.gl;
+        const t = (performance.now() - this.startTime) / 1000;
 
-        // 渐隐拖尾创造运动模糊
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.12)';
-        ctx.fillRect(0, 0, w, h);
+        gl.useProgram(this.program);
+        const posLoc = gl.getAttribLocation(this.program, 'position');
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.posBuf);
+        gl.enableVertexAttribArray(posLoc);
+        gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
 
-        ctx.globalCompositeOperation = 'lighter';
+        const minDim = Math.min(this.canvas.width, this.canvas.height);
+        const pxScale = (this.scale * 2.0) / minDim;
 
-        // 中心棱镜核心
-        const coreRadius = 30 * this.scale;
-        const coreGrd = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreRadius * 4);
-        coreGrd.addColorStop(0, `rgba(255, 255, 255, ${0.9 * this.bloom})`);
-        coreGrd.addColorStop(0.3, `rgba(200, 220, 255, ${0.5 * this.bloom})`);
-        coreGrd.addColorStop(1, 'rgba(0, 0, 0, 0)');
-        ctx.fillStyle = coreGrd;
-        ctx.beginPath();
-        ctx.arc(cx, cy, coreRadius * 4, 0, Math.PI * 2);
-        ctx.fill();
+        gl.uniform2f(this.u.uRes, this.canvas.width, this.canvas.height);
+        gl.uniform1f(this.u.uTime, t);
+        gl.uniform1f(this.u.uHeight, this.height);
+        gl.uniform1f(this.u.uBaseHalf, this.baseWidth / 2);
+        gl.uniform1f(this.u.uGlow, this.glow);
+        gl.uniform1f(this.u.uBloom, this.bloom);
+        gl.uniform1f(this.u.uColorFreq, this.colorFreq);
+        gl.uniform1f(this.u.uHueShift, this.hueShift);
+        gl.uniform1f(this.u.uNoise, this.noise);
+        gl.uniform1f(this.u.uTimeScale, this.timeScale);
+        gl.uniform1f(this.u.uUseWobble, this.useWobble ? 1.0 : 0.0);
+        gl.uniform1f(this.u.uPxScale, pxScale);
 
-        // 旋转的光谱光束（多束发射）
-        const numBeams = 6;
-        for (let i = 0; i < numBeams; i++) {
-            const baseAngle = (i / numBeams) * Math.PI * 2;
-            const rotation = this.time * 0.5;
-            const wobble = Math.sin(this.time * 0.7 + i) * 0.2;
-            const angle = baseAngle + rotation + wobble;
-            const baseHue = (i / numBeams) * 360 + this.time * 30;
-
-            this.drawSpectrumBeam(cx, cy, angle, beamLength, baseHue);
-        }
-
-        // 柔和的光晕环
-        for (let r = 0; r < 3; r++) {
-            const ringRadius = (60 + r * 40) * this.scale;
-            const ringHue = (this.time * 50 + r * 60) % 360;
-            const ringGrd = ctx.createRadialGradient(cx, cy, ringRadius - 10, cx, cy, ringRadius + 20);
-            ringGrd.addColorStop(0, `hsla(${ringHue}, 80%, 60%, 0)`);
-            ringGrd.addColorStop(0.5, `hsla(${ringHue}, 90%, 65%, ${0.15 * this.bloom})`);
-            ringGrd.addColorStop(1, `hsla(${ringHue}, 80%, 60%, 0)`);
-
-            ctx.fillStyle = ringGrd;
-            ctx.beginPath();
-            ctx.arc(cx, cy, ringRadius + 20, 0, Math.PI * 2);
-            ctx.fill();
-        }
-
-        ctx.globalCompositeOperation = 'source-over';
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
 
         this.animationId = requestAnimationFrame(() => this.animate());
     }
