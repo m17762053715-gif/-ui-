@@ -42,7 +42,7 @@
     <header>
         <h1>🎨 VFX-Lib</h1>
         <p class="subtitle">基于 React Bits 算法研究的高质量视觉效果组件库</p>
-        <span class="badge">✅ 15 个组件 | ⚡ WebGL 加速 | 📦 零依赖 | 🆓 MIT 开源</span>
+        <span class="badge">✅ 19 个组件 | ⚡ WebGL 加速 | 📦 零依赖 | 🆓 MIT 开源</span>
     </header>
 
     <div class="container">
@@ -176,6 +176,39 @@
                     <p class="component-desc">文字逐词聚焦，模糊滤镜动画。</p>
                 </div>
             </div>
+            <div class="component-card">
+                <div class="component-demo" id="demo-shinytext" style="background: linear-gradient(135deg, #0a0a14, #14141f); display: flex; align-items: center; justify-content: center;"></div>
+                <div class="component-info">
+                    <h2 class="component-title">ShinyText <span class="tech-tag">CSS background-clip</span></h2>
+                    <p class="component-desc">文字闪光扫过，渐变 + clip。</p>
+                </div>
+            </div>
+            <div class="component-card">
+                <div class="component-demo" id="demo-magnetlines" style="background: linear-gradient(135deg, #1a0a1a, #0a0a14); display: flex; align-items: center; justify-content: center;"></div>
+                <div class="component-info">
+                    <h2 class="component-title">MagnetLines <span class="tech-tag">atan2 角度</span></h2>
+                    <p class="component-desc">网格线全部指向鼠标方向（移动鼠标试试）。</p>
+                </div>
+            </div>
+            <div class="component-card">
+                <div class="component-demo" id="demo-starborder" style="background: linear-gradient(135deg, #0a1a14, #0a0a14); display: flex; align-items: center; justify-content: center;">
+                    <div id="star-border-target" style="cursor: pointer;">点我体验星光边框</div>
+                </div>
+                <div class="component-info">
+                    <h2 class="component-title">StarBorder <span class="tech-tag">CSS 渐变动画</span></h2>
+                    <p class="component-desc">边框星光环绕，按钮装饰必备。</p>
+                </div>
+            </div>
+            <div class="component-card">
+                <div class="component-demo" id="demo-clickspark" style="background: linear-gradient(135deg, #1a141a, #0a0a14); display: flex; align-items: center; justify-content: center; cursor: pointer;">
+                    <p style="color: #888; pointer-events: none;">点击任意位置产生星光</p>
+                </div>
+                <div class="component-info">
+                    <h2 class="component-title">ClickSpark <span class="tech-tag">Canvas 放射动画</span></h2>
+                    <p class="component-desc">点击迸发星光，8 条放射线段。</p>
+                </div>
+            </div>
+            </div>
         </div>
     </div>
 
@@ -199,6 +232,10 @@
     <script src="../components/fluid-glass.js"></script>
     <script src="../components/splash-cursor.js"></script>
     <script src="../components/true-focus.js"></script>
+    <script src="../components/shiny-text.js"></script>
+    <script src="../components/magnet-lines.js"></script>
+    <script src="../components/star-border.js"></script>
+    <script src="../components/click-spark.js"></script>
 
     <script>
         // 背景类
@@ -274,6 +311,43 @@
             blurAmount: 5,
             animationDuration: 0.5,
             pauseBetween: 1
+        });
+
+        new ShinyText({
+            container: document.getElementById('demo-shinytext'),
+            text: 'SHINY TEXT',
+            speed: 4,
+            fontSize: 56,
+            baseColor: 'rgba(180, 180, 200, 0.7)',
+            shineColor: '#ffffff'
+        });
+
+        new MagnetLines({
+            container: document.getElementById('demo-magnetlines'),
+            rows: 9,
+            columns: 9,
+            lineColor: '#9d4edd',
+            lineWidth: '0.6vmin',
+            lineHeight: '4vmin',
+            containerSize: '300px',
+            baseAngle: 0
+        });
+
+        new StarBorder({
+            element: document.getElementById('star-border-target'),
+            color: '#7cff67',
+            speed: '5s',
+            thickness: 1,
+            borderRadius: 24
+        });
+
+        new ClickSpark({
+            container: document.getElementById('demo-clickspark'),
+            sparkColor: '#ffd700',
+            sparkSize: 14,
+            sparkRadius: 25,
+            sparkCount: 12,
+            duration: 500
         });
 
         // FPS 监控
