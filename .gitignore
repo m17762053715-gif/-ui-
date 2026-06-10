@@ -19,3 +19,4 @@ coverage/
 *.sw?
 Thumbs.db
 desktop.ini
+react-bits-analysis/

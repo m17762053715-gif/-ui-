@@ -12,159 +12,168 @@
         .subtitle { font-size: 20px; opacity: 0.95; margin-bottom: 10px; }
         .badge { display: inline-block; background: rgba(255, 255, 255, 0.2); padding: 8px 16px; border-radius: 20px; font-size: 14px; margin-top: 15px; }
         .container { max-width: 1600px; margin: 0 auto; padding: 60px 20px; }
-        .intro { text-align: center; margin-bottom: 60px; }
-        .intro h2 { font-size: 32px; margin-bottom: 20px; }
-        .intro p { font-size: 18px; color: #aaa; max-width: 900px; margin: 0 auto; line-height: 1.8; }
-        .highlight { color: #667eea; font-weight: bold; }
-        .component-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(600px, 1fr)); gap: 50px; }
+        .section-title { font-size: 32px; margin: 40px 0 30px; padding-bottom: 12px; border-bottom: 2px solid #333; color: #aab; }
+        .component-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(550px, 1fr)); gap: 40px; }
         .component-card { background: #1a1a1a; border-radius: 16px; overflow: hidden; border: 2px solid #333; transition: all 0.3s; }
-        .component-card:hover { transform: translateY(-8px); border-color: #667eea; box-shadow: 0 10px 40px rgba(102, 126, 234, 0.3); }
-        .component-demo { width: 100%; height: 450px; position: relative; background: #000; border-bottom: 2px solid #333; }
-        .component-info { padding: 30px; }
-        .component-title { font-size: 28px; margin-bottom: 12px; color: #667eea; display: flex; align-items: center; gap: 10px; }
-        .tech-tag { font-size: 12px; background: rgba(102, 126, 234, 0.2); padding: 4px 10px; border-radius: 12px; color: #aaf; }
-        .component-desc { color: #bbb; margin-bottom: 20px; line-height: 1.8; font-size: 16px; }
-        .controls { display: flex; flex-wrap: wrap; gap: 15px; margin-top: 20px; padding-top: 20px; border-top: 1px solid #333; }
-        .control-group { flex: 1; min-width: 220px; }
-        .control-group label { display: block; font-size: 13px; color: #888; margin-bottom: 8px; font-weight: 500; }
+        .component-card:hover { transform: translateY(-6px); border-color: #667eea; box-shadow: 0 10px 40px rgba(102, 126, 234, 0.3); }
+        .component-demo { width: 100%; height: 380px; position: relative; background: #000; border-bottom: 2px solid #333; overflow: hidden; }
+        .component-info { padding: 24px; }
+        .component-title { font-size: 22px; margin-bottom: 10px; color: #667eea; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .tech-tag { font-size: 11px; background: rgba(102, 126, 234, 0.2); padding: 3px 8px; border-radius: 10px; color: #aaf; }
+        .component-desc { color: #bbb; margin-bottom: 16px; line-height: 1.7; font-size: 14px; }
+        .controls { display: flex; flex-wrap: wrap; gap: 12px; padding-top: 14px; border-top: 1px solid #333; }
+        .control-group { flex: 1; min-width: 180px; }
+        .control-group label { display: block; font-size: 12px; color: #888; margin-bottom: 6px; }
         .control-group input[type="range"] { width: 100%; height: 6px; border-radius: 3px; background: #333; outline: none; }
-        .control-group input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #667eea; cursor: pointer; }
+        .control-group input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: #667eea; cursor: pointer; }
         .value-display { color: #667eea; font-weight: bold; }
         footer { text-align: center; padding: 50px 20px; color: #666; border-top: 1px solid #333; margin-top: 80px; }
         footer a { color: #667eea; text-decoration: none; }
-        #fps-monitor { position: fixed; top: 10px; right: 10px; background: rgba(0,0,0,0.8); color: #0f0; padding: 10px 15px; border-radius: 8px; font-family: monospace; font-size: 14px; z-index: 9999; border: 1px solid #333; }
+        #fps-monitor { position: fixed; top: 10px; right: 10px; background: rgba(0,0,0,0.85); color: #0f0; padding: 10px 15px; border-radius: 8px; font-family: monospace; font-size: 14px; z-index: 9999; border: 1px solid #333; }
         #fps-monitor.warning { color: #ff0; }
         #fps-monitor.error { color: #f00; }
+        .demo-content { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
+        .demo-content > * { pointer-events: auto; }
     </style>
 </head>
 <body>
-    <div id="fps-monitor">FPS: -- | GPU: OK</div>
+    <div id="fps-monitor">FPS: --</div>
 
     <header>
         <h1>🎨 VFX-Lib</h1>
-        <p class="subtitle">基于 React Bits 源码的高质量视觉效果组件库</p>
-        <span class="badge">✅ 5 个高级组件 | ⚡ WebGL 加速 | 📦 零依赖 | 🆓 MIT 开源</span>
+        <p class="subtitle">基于 React Bits 算法研究的高质量视觉效果组件库</p>
+        <span class="badge">✅ 15 个组件 | ⚡ WebGL 加速 | 📦 零依赖 | 🆓 MIT 开源</span>
     </header>
 
     <div class="container">
-        <div class="intro">
-            <h2>真正高质量的实现</h2>
-            <p>
-                我们深入研究了 <span class="highlight">React Bits</span> 的核心算法，
-                理解了每个组件背后的<span class="highlight">数学原理和着色器实现</span>，
-                然后用<span class="highlight">纯 WebGL</span> 完整重写。每个组件都基于真实源码，
-                保留了原版的视觉质量和算法精髓。
-            </p>
-        </div>
-
+        <h2 class="section-title">🌌 背景效果</h2>
         <div class="component-grid">
-            <!-- Galaxy -->
             <div class="component-card">
                 <div class="component-demo" id="demo-galaxy"></div>
                 <div class="component-info">
-                    <h2 class="component-title">Galaxy - 星系 <span class="tech-tag">WebGL + Hash 函数</span></h2>
-                    <p class="component-desc">
-                        使用 Hash 函数生成伪随机星星分布，多层深度系统创造 3D 视差效果。
-                        星星会闪烁、旋转，并对鼠标产生排斥反应。完全基于 React Bits 原版算法。
-                    </p>
-                    <div class="controls">
-                        <div class="control-group">
-                            <label>密度: <span class="value-display" id="galaxy-density-val">1.0</span></label>
-                            <input type="range" id="galaxy-density" min="0.5" max="3" value="1.0" step="0.1">
-                        </div>
-                        <div class="control-group">
-                            <label>旋转速度: <span class="value-display" id="galaxy-rotation-val">0.1</span></label>
-                            <input type="range" id="galaxy-rotation" min="0" max="0.5" value="0.1" step="0.05">
-                        </div>
-                    </div>
+                    <h2 class="component-title">Galaxy <span class="tech-tag">WebGL + Hash</span></h2>
+                    <p class="component-desc">星空效果，多层深度，鼠标排斥交互。</p>
                 </div>
             </div>
-
-            <!-- Aurora -->
             <div class="component-card">
                 <div class="component-demo" id="demo-aurora"></div>
                 <div class="component-info">
-                    <h2 class="component-title">Aurora - 极光 <span class="tech-tag">WebGL 2.0 + Simplex Noise</span></h2>
-                    <p class="component-desc">
-                        <strong>核心：Simplex Noise 噪声函数。</strong>
-                        通过指数函数和 smoothstep 创造柔和的极光过渡效果。颜色渐变系统支持 3 个颜色停止点。
-                    </p>
-                    <div class="controls">
-                        <div class="control-group">
-                            <label>振幅: <span class="value-display" id="aurora-amp-val">1.0</span></label>
-                            <input type="range" id="aurora-amp" min="0.5" max="2" value="1.0" step="0.1">
-                        </div>
-                        <div class="control-group">
-                            <label>混合强度: <span class="value-display" id="aurora-blend-val">0.5</span></label>
-                            <input type="range" id="aurora-blend" min="0.1" max="1" value="0.5" step="0.1">
-                        </div>
-                    </div>
+                    <h2 class="component-title">Aurora <span class="tech-tag">WebGL 2 + Simplex Noise</span></h2>
+                    <p class="component-desc">极光效果，柔和的色彩过渡。</p>
                 </div>
             </div>
-
-            <!-- Waves -->
             <div class="component-card">
                 <div class="component-demo" id="demo-waves"></div>
                 <div class="component-info">
-                    <h2 class="component-title">Waves - 波浪 <span class="tech-tag">Canvas 2D + Perlin Noise</span></h2>
-                    <p class="component-desc">
-                        <strong>核心：Perlin Noise + 物理弹簧系统。</strong>
-                        每个点通过 Perlin Noise 驱动，加上弹簧物理模拟和鼠标交互，创造流动的波浪效果。
-                    </p>
-                    <div class="controls">
-                        <div class="control-group">
-                            <label>波速 X: <span class="value-display" id="waves-speedx-val">0.0125</span></label>
-                            <input type="range" id="waves-speedx" min="0" max="0.05" value="0.0125" step="0.0025">
-                        </div>
-                        <div class="control-group">
-                            <label>振幅: <span class="value-display" id="waves-amp-val">32</span></label>
-                            <input type="range" id="waves-amp" min="10" max="100" value="32" step="5">
-                        </div>
-                    </div>
+                    <h2 class="component-title">Waves <span class="tech-tag">Canvas 2D + Perlin Noise</span></h2>
+                    <p class="component-desc">波浪线条，物理弹簧 + 鼠标交互。</p>
                 </div>
             </div>
-
-            <!-- Plasma -->
             <div class="component-card">
                 <div class="component-demo" id="demo-plasma"></div>
                 <div class="component-info">
-                    <h2 class="component-title">Plasma - 等离子体 <span class="tech-tag">WebGL 2.0 + 复杂着色器</span></h2>
-                    <p class="component-desc">
-                        <strong>核心：复杂的数学着色器。</strong>
-                        使用 ray marching、正弦波叠加、tanh 函数创造流动的等离子体效果。支持彩色和单色模式。
-                    </p>
-                    <div class="controls">
-                        <div class="control-group">
-                            <label>速度: <span class="value-display" id="plasma-speed-val">1.0</span></label>
-                            <input type="range" id="plasma-speed" min="0.1" max="3" value="1.0" step="0.1">
-                        </div>
-                        <div class="control-group">
-                            <label>缩放: <span class="value-display" id="plasma-scale-val">1.0</span></label>
-                            <input type="range" id="plasma-scale" min="0.5" max="2" value="1.0" step="0.1">
-                        </div>
-                    </div>
+                    <h2 class="component-title">Plasma <span class="tech-tag">WebGL 2 + Ray Marching</span></h2>
+                    <p class="component-desc">流动等离子体效果。</p>
                 </div>
             </div>
-
-            <!-- Particles3D -->
             <div class="component-card">
                 <div class="component-demo" id="demo-particles"></div>
                 <div class="component-info">
-                    <h2 class="component-title">Particles3D - 3D 粒子 <span class="tech-tag">WebGL + 3D 相机</span></h2>
-                    <p class="component-desc">
-                        <strong>核心：3D 透视投影 + 正弦波动画。</strong>
-                        粒子在 3D 空间中通过正弦波运动，使用透视投影实现近大远小效果。完整的 3D 相机系统。
-                    </p>
-                    <div class="controls">
-                        <div class="control-group">
-                            <label>粒子数量: <span class="value-display" id="particles-count-val">200</span></label>
-                            <input type="range" id="particles-count" min="100" max="500" value="200" step="50">
-                        </div>
-                        <div class="control-group">
-                            <label>速度: <span class="value-display" id="particles-speed-val">0.1</span></label>
-                            <input type="range" id="particles-speed" min="0" max="0.5" value="0.1" step="0.05">
+                    <h2 class="component-title">Particles3D <span class="tech-tag">WebGL + 3D 相机</span></h2>
+                    <p class="component-desc">彩色 3D 粒子球（原创彩色版本）。</p>
+                </div>
+            </div>
+            <div class="component-card">
+                <div class="component-demo" id="demo-dotfield"></div>
+                <div class="component-info">
+                    <h2 class="component-title">DotField <span class="tech-tag">Canvas 2D</span></h2>
+                    <p class="component-desc">点阵网格，鼠标产生波纹推开效果。</p>
+                </div>
+            </div>
+            <div class="component-card">
+                <div class="component-demo" id="demo-siderays"></div>
+                <div class="component-info">
+                    <h2 class="component-title">SideRays <span class="tech-tag">Canvas 2D</span></h2>
+                    <p class="component-desc">侧边光束扫射效果。</p>
+                </div>
+            </div>
+            <div class="component-card">
+                <div class="component-demo" id="demo-prism"></div>
+                <div class="component-info">
+                    <h2 class="component-title">Prism <span class="tech-tag">Canvas 2D + 光谱</span></h2>
+                    <p class="component-desc">棱镜光谱色散动画。</p>
+                </div>
+            </div>
+        </div>
+
+        <h2 class="section-title">🎯 交互组件</h2>
+        <div class="component-grid">
+            <div class="component-card">
+                <div class="component-demo" id="demo-borderglow" style="background: #1a1a1a; padding: 40px;">
+                    <div id="border-glow-target" style="width: 100%; height: 100%; padding: 30px; display: flex; align-items: center; justify-content: center; background: #0a0a0a; border-radius: 12px;">
+                        <div style="text-align: center;">
+                            <h3 style="color: #fff; margin-bottom: 8px;">边框流光</h3>
+                            <p style="color: #888; font-size: 13px;">CSS 锥形渐变 + 自定义属性动画</p>
                         </div>
                     </div>
+                </div>
+                <div class="component-info">
+                    <h2 class="component-title">BorderGlow <span class="tech-tag">CSS</span></h2>
+                    <p class="component-desc">流动的边框发光效果。</p>
+                </div>
+            </div>
+            <div class="component-card">
+                <div class="component-demo" id="demo-dock" style="background: linear-gradient(135deg, #1a1a2e, #0a0a0a);"></div>
+                <div class="component-info">
+                    <h2 class="component-title">Dock <span class="tech-tag">JS + 距离感应</span></h2>
+                    <p class="component-desc">类 macOS 程序坞，鼠标靠近图标放大。</p>
+                </div>
+            </div>
+            <div class="component-card">
+                <div class="component-demo" id="demo-slider" style="background: #1a1a1a; padding: 60px 40px;"></div>
+                <div class="component-info">
+                    <h2 class="component-title">ElasticSlider <span class="tech-tag">JS + 弹簧物理</span></h2>
+                    <p class="component-desc">弹性滑块，超出边界会拉伸变形。</p>
+                </div>
+            </div>
+            <div class="component-card">
+                <div class="component-demo" id="demo-gooeynav" style="background: linear-gradient(135deg, #2a1a3e, #1a1a2e); display: flex; align-items: center; justify-content: center;"></div>
+                <div class="component-info">
+                    <h2 class="component-title">GooeyNav <span class="tech-tag">SVG Filter</span></h2>
+                    <p class="component-desc">粘性导航，使用 SVG goo 滤镜。</p>
+                </div>
+            </div>
+            <div class="component-card">
+                <div class="component-demo" id="demo-fluidglass" style="background: url('https://picsum.photos/600/400?random=1') center/cover; cursor: none;">
+                    <div class="demo-content">
+                        <p style="background: rgba(0,0,0,0.5); padding: 12px 20px; border-radius: 8px; pointer-events: none;">移动鼠标查看玻璃透镜效果</p>
+                    </div>
+                </div>
+                <div class="component-info">
+                    <h2 class="component-title">FluidGlass <span class="tech-tag">CSS + backdrop-filter</span></h2>
+                    <p class="component-desc">跟随鼠标的玻璃透镜，速度产生形变。</p>
+                </div>
+            </div>
+        </div>
+
+        <h2 class="section-title">✨ 动画 & 文本</h2>
+        <div class="component-grid">
+            <div class="component-card">
+                <div class="component-demo" id="demo-splash" style="background: linear-gradient(135deg, #1a0a2e, #0a0a1a); cursor: none;">
+                    <div class="demo-content">
+                        <p style="color: #aaa; pointer-events: none;">移动鼠标产生彩色喷溅</p>
+                    </div>
+                </div>
+                <div class="component-info">
+                    <h2 class="component-title">SplashCursor <span class="tech-tag">Canvas 粒子系统</span></h2>
+                    <p class="component-desc">鼠标移动产生彩色粒子喷溅。</p>
+                </div>
+            </div>
+            <div class="component-card">
+                <div class="component-demo" id="demo-truefocus" style="background: linear-gradient(135deg, #0a1a2a, #0a0a1a); display: flex; align-items: center; justify-content: center;"></div>
+                <div class="component-info">
+                    <h2 class="component-title">TrueFocus <span class="tech-tag">CSS Filter</span></h2>
+                    <p class="component-desc">文字逐词聚焦，模糊滤镜动画。</p>
                 </div>
             </div>
         </div>
@@ -175,159 +184,90 @@
         <p>基于 <a href="https://github.com/DavidHDev/react-bits" target="_blank">React Bits</a> 算法研究 | MIT License</p>
     </footer>
 
-    <!-- 加载所有组件 -->
     <script src="../components/galaxy.js"></script>
     <script src="../components/aurora.js"></script>
     <script src="../components/waves.js"></script>
     <script src="../components/plasma.js"></script>
     <script src="../components/particles3d.js"></script>
+    <script src="../components/dot-field.js"></script>
+    <script src="../components/side-rays.js"></script>
+    <script src="../components/prism.js"></script>
+    <script src="../components/border-glow.js"></script>
+    <script src="../components/dock.js"></script>
+    <script src="../components/elastic-slider.js"></script>
+    <script src="../components/gooey-nav.js"></script>
+    <script src="../components/fluid-glass.js"></script>
+    <script src="../components/splash-cursor.js"></script>
+    <script src="../components/true-focus.js"></script>
 
     <script>
-        // 初始化所有组件
-        let galaxyInstance = new Galaxy({
-            container: document.getElementById('demo-galaxy'),
-            density: 1.0,
-            speed: 1.0,
-            hueShift: 140,
-            rotationSpeed: 0.1,
-            mouseRepulsion: true
+        // 背景类
+        new Galaxy({ container: document.getElementById('demo-galaxy'), density: 1.0, hueShift: 140, rotationSpeed: 0.1 });
+        new Aurora({ container: document.getElementById('demo-aurora'), colorStops: ['#5227FF', '#7cff67', '#5227FF'] });
+        new Waves({ container: document.getElementById('demo-waves'), lineColor: '#00ffff' });
+        new Plasma({ container: document.getElementById('demo-plasma'), speed: 1.0 });
+        new Particles3D({ container: document.getElementById('demo-particles'), count: 200, colors: ['#ff0080', '#00ff80', '#0080ff', '#ff8000', '#8000ff', '#ffff00'], speed: 0.1 });
+        new DotField({ container: document.getElementById('demo-dotfield') });
+        new SideRays({ container: document.getElementById('demo-siderays'), color: '#00ffff', origin: 'top-left' });
+        new Prism({ container: document.getElementById('demo-prism'), speed: 0.5 });
+
+        // 交互组件
+        new BorderGlow({ element: document.getElementById('border-glow-target') });
+        new Dock({
+            container: document.getElementById('demo-dock'),
+            items: [
+                { icon: '🚀', label: 'Launch', bgColor: '#ff0080' },
+                { icon: '🎨', label: 'Design', bgColor: '#7928ca' },
+                { icon: '⚡', label: 'Speed', bgColor: '#0070f3' },
+                { icon: '🎯', label: 'Focus', bgColor: '#00ff88' },
+                { icon: '🔥', label: 'Trending', bgColor: '#ff6b00' },
+                { icon: '💎', label: 'Premium', bgColor: '#00d2ff' }
+            ]
+        });
+        // 居中 dock
+        const dockEl = document.getElementById('demo-dock');
+        dockEl.style.display = 'flex';
+        dockEl.style.alignItems = 'center';
+        dockEl.style.justifyContent = 'center';
+
+        new ElasticSlider({ container: document.getElementById('demo-slider'), value: 50 });
+
+        new GooeyNav({
+            container: document.getElementById('demo-gooeynav'),
+            items: [
+                { label: '首页' }, { label: '产品' }, { label: '关于' }, { label: '联系' }
+            ]
         });
 
-        let auroraInstance = new Aurora({
-            container: document.getElementById('demo-aurora'),
-            colorStops: ['#5227FF', '#7cff67', '#5227FF'],
-            amplitude: 1.0,
-            blend: 0.5,
-            speed: 1.0
-        });
+        new FluidGlass({ container: document.getElementById('demo-fluidglass'), size: 100 });
 
-        let wavesInstance = new Waves({
-            container: document.getElementById('demo-waves'),
-            lineColor: '#00ffff',
-            waveSpeedX: 0.0125,
-            waveSpeedY: 0.005,
-            waveAmpX: 32,
-            waveAmpY: 16
-        });
+        new SplashCursor({ container: document.getElementById('demo-splash') });
 
-        let plasmaInstance = new Plasma({
-            container: document.getElementById('demo-plasma'),
-            speed: 1.0,
-            scale: 1.0,
-            opacity: 1.0,
-            color: null // 彩色模式
+        new TrueFocus({
+            container: document.getElementById('demo-truefocus'),
+            text: 'TRUE FOCUS NOW',
+            borderColor: '#00ffff',
+            glowColor: 'rgba(0, 255, 255, 0.5)'
         });
-
-        let particlesInstance = new Particles3D({
-            container: document.getElementById('demo-particles'),
-            count: 200,
-            spread: 10,
-            speed: 0.1,
-            baseSize: 100,
-            sizeRandomness: 1,
-            cameraDistance: 20,
-            colors: ['#ff0080', '#00ff80', '#0080ff', '#ff8000', '#8000ff', '#ffff00'], // 彩色
-            alphaParticles: true,
-            disableRotation: false,
-            moveParticlesOnHover: false
-        });
-
-        // 控制面板
-        document.getElementById('galaxy-density').addEventListener('input', (e) => {
-            document.getElementById('galaxy-density-val').textContent = e.target.value;
-            galaxyInstance.density = parseFloat(e.target.value);
-        });
-
-        document.getElementById('galaxy-rotation').addEventListener('input', (e) => {
-            document.getElementById('galaxy-rotation-val').textContent = e.target.value;
-            galaxyInstance.rotationSpeed = parseFloat(e.target.value);
-        });
-
-        document.getElementById('aurora-amp').addEventListener('input', (e) => {
-            document.getElementById('aurora-amp-val').textContent = e.target.value;
-            auroraInstance.amplitude = parseFloat(e.target.value);
-        });
-
-        document.getElementById('aurora-blend').addEventListener('input', (e) => {
-            document.getElementById('aurora-blend-val').textContent = e.target.value;
-            auroraInstance.blend = parseFloat(e.target.value);
-        });
-
-        document.getElementById('waves-speedx').addEventListener('input', (e) => {
-            document.getElementById('waves-speedx-val').textContent = e.target.value;
-            wavesInstance.waveSpeedX = parseFloat(e.target.value);
-        });
-
-        document.getElementById('waves-amp').addEventListener('input', (e) => {
-            document.getElementById('waves-amp-val').textContent = e.target.value;
-            wavesInstance.waveAmpX = parseFloat(e.target.value);
-        });
-
-        document.getElementById('plasma-speed').addEventListener('input', (e) => {
-            document.getElementById('plasma-speed-val').textContent = e.target.value;
-            plasmaInstance.speed = parseFloat(e.target.value);
-        });
-
-        document.getElementById('plasma-scale').addEventListener('input', (e) => {
-            document.getElementById('plasma-scale-val').textContent = e.target.value;
-            plasmaInstance.scale = parseFloat(e.target.value);
-        });
-
-        document.getElementById('particles-count').addEventListener('input', (e) => {
-            document.getElementById('particles-count-val').textContent = e.target.value;
-            particlesInstance.destroy();
-            particlesInstance = new Particles3D({
-                container: document.getElementById('demo-particles'),
-                count: parseInt(e.target.value),
-                spread: 10,
-                speed: parseFloat(document.getElementById('particles-speed').value),
-                baseSize: 100,
-                sizeRandomness: 1,
-                cameraDistance: 20,
-                colors: ['#ff0080', '#00ff80', '#0080ff', '#ff8000', '#8000ff', '#ffff00'],
-                alphaParticles: true
-            });
-        });
-
-        document.getElementById('particles-speed').addEventListener('input', (e) => {
-            document.getElementById('particles-speed-val').textContent = e.target.value;
-            particlesInstance.speed = parseFloat(e.target.value);
-        });
-
-        console.log('✅ VFX-Lib 已加载完成！');
-        console.log('📊 5 个高质量组件，全部基于 React Bits 源码实现');
 
         // FPS 监控
-        let lastTime = performance.now();
-        let frames = 0;
-        let fps = 0;
-
+        let lastTime = performance.now(), frames = 0;
         function updateFPS() {
             frames++;
             const now = performance.now();
             if (now >= lastTime + 1000) {
-                fps = Math.round((frames * 1000) / (now - lastTime));
+                const fps = Math.round((frames * 1000) / (now - lastTime));
                 frames = 0;
                 lastTime = now;
-
                 const monitor = document.getElementById('fps-monitor');
                 monitor.textContent = `FPS: ${fps}`;
-
-                // 性能提示
-                if (fps < 30) {
-                    monitor.className = 'error';
-                    monitor.textContent += ' | ⚠️ 性能低';
-                } else if (fps < 50) {
-                    monitor.className = 'warning';
-                    monitor.textContent += ' | ⚠ 可优化';
-                } else {
-                    monitor.className = '';
-                    monitor.textContent += ' | ✓ 流畅';
-                }
+                monitor.className = fps < 30 ? 'error' : (fps < 50 ? 'warning' : '');
             }
             requestAnimationFrame(updateFPS);
         }
         updateFPS();
+
+        console.log('✅ VFX-Lib 15 个组件已加载');
     </script>
 </body>
 </html>
