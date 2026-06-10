@@ -1,0 +1,31 @@
+{
+  "name": "vfx-lib",
+  "version": "1.0.0",
+  "description": "轻量级、高性能的视觉效果组件库 - 纯原生实现，不依赖任何框架",
+  "main": "components/index.js",
+  "keywords": [
+    "webgl",
+    "canvas",
+    "animation",
+    "effects",
+    "particles",
+    "visual",
+    "background",
+    "vfx"
+  ],
+  "author": "陈德宏",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/vfx-lib.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yourusername/vfx-lib/issues"
+  },
+  "homepage": "https://github.com/yourusername/vfx-lib#readme",
+  "files": [
+    "components/",
+    "css/",
+    "README.md"
+  ]
+}
